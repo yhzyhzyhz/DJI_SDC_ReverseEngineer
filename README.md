@@ -62,15 +62,15 @@ Byte 5 is Listener
 
 Byte 6 7 is sequence number: This 16 bits little endian number seems only growing. It may skip a number but only increasing. start from 0x0001 on power unit power on. The Tx and Rx frame seems have the same sequence number to indicate this is the reply of which frame.
 
-Byte 8 is Direction: so far only two possible observed:
+Byte 8 is Direction: so far only 3 possible observed:
 
     0x40 is a frame sent from power unit
 
-    0x80 is a frame sent to the power unit
+    0x80 is a frame sent to the power unit\
+
+    0x00 only observed on few cases, seems to be a boardcast type of message
 
 Byte 9 is 0x00 on initial handshake and 0x5A there after. 
-
-
 
 Then the payload bytes here. variable length.
 
@@ -89,6 +89,12 @@ Byte 14 15 are current. unit is x0.01A
 ### Class_B == 0x2D:
 
 Frame from expansion battery to power unit. 
+
+Byte 77 78 are pack voltage in mV. 
+
+Byte 85 86 are int16 pack current in mA. Positive is charging the battery pack. 
+
+Byte 97 to 128 are 16 uint16 of single cell voltage. x0.01V
 
 
 ### Class_B == 0x38:
@@ -109,7 +115,7 @@ MPPT reply to power unit 0x66 request.
 
 Byte 16 17 are output voltage. 
 
-Byte 18 20 are current. 
+Byte 18 19 are current. 
 
 Byte 28 29 are temperature x0.1. 
 
