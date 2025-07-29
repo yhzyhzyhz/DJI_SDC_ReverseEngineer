@@ -1,10 +1,42 @@
-import serial
+import serial, serial.tools.list_ports
 import threading
 import time
+from datetime import datetime, timezone
 
-SERIAL_PORTS = ['COM7', 'COM9']
 BAUDRATE = 115200
-OUTPUT_FILE = 'Data/serial_frames.txt'
+OUTPUT_FILE_PFX = 'Data/serial_frames_'
+
+OUTPUT_FILE = OUTPUT_FILE_PFX + datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S") + "z.txt"
+
+def select_serial_ports():
+    ports = list(serial.tools.list_ports.comports())
+    if not ports:
+        print("No serial ports available. ")
+        return None
+    
+    for i, port in enumerate(ports):
+        print(f"{i}: {port.device} - {port.description}")
+
+    selected_indices = set()
+    selected_ports = []
+
+    while True:
+        choice = input(f"Select port [0-{len(ports)-1}] or 's' to stop: ").strip()
+        if choice.lower() == 's':
+            break
+        if choice.isdigit():
+            idx = int(choice)
+            if 0<= idx < len(ports):
+                if idx in selected_indices:
+                    print("Port already selected. ")
+                    continue
+                selected_indices.add(idx)
+                selected_ports.append(ports[idx].device)
+                continue
+        print("Invalid selection. Please try again. ")
+    
+    return selected_ports
+
 
 def read_serial(port_name, file_lock):
     ser = serial.Serial(port_name, BAUDRATE, timeout=0.6)
@@ -35,9 +67,10 @@ def read_serial(port_name, file_lock):
             buffer.clear()  # Reset if out of sync
 
 def main():
+    serial_ports = select_serial_ports()
     file_lock = threading.Lock()
     threads = []
-    for port in SERIAL_PORTS:
+    for port in serial_ports:
         t = threading.Thread(target=read_serial, args=(port, file_lock), daemon=True)
         t.start()
         threads.append(t)
