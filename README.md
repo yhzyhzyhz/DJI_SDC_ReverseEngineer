@@ -117,6 +117,10 @@ Byte 16 17 are output voltage.
 
 Byte 18 19 are current. 
 
+Byte 24 is how many inputs available (0, 1, 2, 3 on 3 port MPPT module). 
+
+Byte 25 indicate charging or not (0x00 when current is 0; 0x01 when charging). 
+
 Byte 28 29 are temperature x0.1. 
 
 Byte 30 31 are MPPT first input port voltage. 
