@@ -113,13 +113,21 @@ Power unit request information from MPPT module.
 
 MPPT reply to power unit 0x66 request. 
 
-Byte 16 17 are output voltage. 
+Byte 16 17 are output voltage. This is the number shown on LCD. 
 
 Byte 18 19 are current. 
+
+Byte 20 21 unknown. 
+
+Byte 22 23 seems to be the max input voltage. 
+(On 3 port MPPT module this is the highest port voltage on the 3 ports. 
+Also is the port used to charge the battery.)
 
 Byte 24 is how many inputs available (0, 1, 2, 3 on 3 port MPPT module). 
 
 Byte 25 indicate charging or not (0x00 when current is 0; 0x01 when charging). 
+
+Byte 26 27 are input power x0.1W. This is the number shown on LCD. 
 
 Byte 28 29 are temperature x0.1. 
 

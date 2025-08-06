@@ -97,9 +97,9 @@ def parse_frame(frame):
 
             byte2021_var.set(f"Byte20 21: {int.from_bytes(frame[20:22], byteorder='little')}")
             byte2223_var.set(f"Byte22 23: {int.from_bytes(frame[22:24], byteorder='little')}")
-            byte2627_var.set(f"Byte26 27: {int.from_bytes(frame[26:28], byteorder='little')}")
+            byte2627_var.set(f"Input Power: {int.from_bytes(frame[26:28], byteorder='little')}")
 
-            output_power_var.set(f"Output Power: {(output_voltage*output_current):.2f} W")
+            output_power_var.set(f"Output Power(Calculated): {(output_voltage*output_current):.2f} W")
             output_voltage_var.set(f"Output Voltage: {output_voltage:.2f} V")
             output_current_var.set(f"Output Current: {output_current:.2f} A")
             temperature_var.set(f"Temperature: {temperature:.1f} C")
