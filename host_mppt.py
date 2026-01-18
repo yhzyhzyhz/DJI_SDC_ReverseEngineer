@@ -204,6 +204,22 @@ def serial_worker():
                         print(log_entry.strip())
                         log_file.write(log_entry)
                         log_file.flush()
+                        
+                        # Parse frames from received data
+                        if len(data) > 3:
+                            i = 0
+                            while i < len(data):
+                                if data[i] == 0x55 and i + 1 < len(data):
+                                    frame_length = data[i + 1]
+                                    if i + frame_length + 2 <= len(data):
+                                        frame = data[i:i + frame_length + 2]
+                                        if len(frame) > 3 and frame[3] == 0x9C:
+                                            process_frame_9c(frame)
+                                        i += frame_length + 2
+                                    else:
+                                        i += 1
+                                else:
+                                    i += 1
                     
                     time.sleep(0.01)  # Small sleep to prevent busy waiting
                     
@@ -251,6 +267,37 @@ def stop_serial_thread():
     else:
         print("Serial thread is not running.")
 
+
+def process_frame_9c(frame):
+    """Process and display 0x9C frame data."""
+    try:
+        if len(frame) < 36:
+            return
+        
+        # Extract values from frame
+        output_voltage = int.from_bytes(frame[16:18], byteorder='little') * 0.01
+        output_current = int.from_bytes(frame[18:20], byteorder='little') * 0.01
+        temperature = int.from_bytes(frame[28:30], byteorder='little') * 0.1
+        input_voltage_1 = int.from_bytes(frame[30:32], byteorder='little') * 0.01
+        input_voltage_2 = int.from_bytes(frame[32:34], byteorder='little') * 0.01
+        input_voltage_3 = int.from_bytes(frame[34:36], byteorder='little') * 0.01
+        
+        # Update variables
+        byte2021_var.set(f"Byte20-21: {int.from_bytes(frame[20:22], byteorder='little')}")
+        byte2223_var.set(f"Byte22-23: {int.from_bytes(frame[22:24], byteorder='little')}")
+        byte2627_var.set(f"Input Power: {int.from_bytes(frame[26:28], byteorder='little')} W")
+        
+        output_power = output_voltage * output_current
+        output_power_var.set(f"Output Power: {output_power:.2f} W")
+        output_voltage_var.set(f"Output Voltage: {output_voltage:.2f} V")
+        output_current_var.set(f"Output Current: {output_current:.2f} A")
+        temperature_var.set(f"Temperature: {temperature:.1f} C")
+        input_voltage_1_var.set(f"Input Voltage 1: {input_voltage_1:.2f} V")
+        input_voltage_2_var.set(f"Input Voltage 2: {input_voltage_2:.2f} V")
+        input_voltage_3_var.set(f"Input Voltage 3: {input_voltage_3:.2f} V")
+    except Exception as e:
+        print(f"Error processing 0x9C frame: {e}")
+
 test = add_crc16_checksum(update_sequence_number(INITIAL_BYTES1))
 print("Test Frame with CRC:", ' '.join(f'{byte:02X}' for byte in test))
 
@@ -262,13 +309,13 @@ root.title("MPPT Controller")
 tk.Label(root, text="Voltage (V):").grid(row=0, column=0, padx=10, pady=10)
 voltage_entry = tk.Entry(root)
 voltage_entry.grid(row=0, column=1)
-voltage_entry.insert(0, "0.0") # Default value
+voltage_entry.insert(0, "48.0") # Default value
 
 # Current Input Row
 tk.Label(root, text="Current (A):").grid(row=1, column=0, padx=10, pady=10)
 current_entry = tk.Entry(root)
 current_entry.grid(row=1, column=1)
-current_entry.insert(0, "0.0") # Default value
+current_entry.insert(0, "1.0") # Default value
 
 # Set Button
 set_button = tk.Button(root, text="Set", command=set_values, width=10)
@@ -283,7 +330,31 @@ stop_serial_button.grid(row=3, column=1, padx=5, pady=10)
 
 # Status Label (to show success or error)
 status_label = tk.Label(root, text="Enter values and click Set")
-status_label.grid(row=4, column=0, columnspan=2)
+status_label.grid(row=4, column=0, columnspan=2, pady=10)
+
+# Create variables for frame data display
+byte2021_var = tk.StringVar(value="Byte20-21: N/A")
+byte2223_var = tk.StringVar(value="Byte22-23: N/A")
+byte2627_var = tk.StringVar(value="Input Power: N/A")
+output_power_var = tk.StringVar(value="Output Power: N/A")
+output_voltage_var = tk.StringVar(value="Output Voltage: N/A")
+output_current_var = tk.StringVar(value="Output Current: N/A")
+temperature_var = tk.StringVar(value="Temperature: N/A")
+input_voltage_1_var = tk.StringVar(value="Input Voltage 1: N/A")
+input_voltage_2_var = tk.StringVar(value="Input Voltage 2: N/A")
+input_voltage_3_var = tk.StringVar(value="Input Voltage 3: N/A")
+
+# Display decoded values
+tk.Label(root, textvariable=output_power_var).grid(row=7, column=0, columnspan=2, sticky="w", padx=20)
+tk.Label(root, textvariable=output_voltage_var).grid(row=8, column=0, columnspan=2, sticky="w", padx=20)
+tk.Label(root, textvariable=output_current_var).grid(row=9, column=0, columnspan=2, sticky="w", padx=20)
+tk.Label(root, textvariable=temperature_var).grid(row=10, column=0, columnspan=2, sticky="w", padx=20)
+tk.Label(root, textvariable=input_voltage_1_var).grid(row=11, column=0, columnspan=2, sticky="w", padx=20)
+tk.Label(root, textvariable=input_voltage_2_var).grid(row=12, column=0, columnspan=2, sticky="w", padx=20)
+tk.Label(root, textvariable=input_voltage_3_var).grid(row=13, column=0, columnspan=2, sticky="w", padx=20)
+tk.Label(root, textvariable=byte2021_var).grid(row=14, column=0, columnspan=2, sticky="w", padx=20)
+tk.Label(root, textvariable=byte2223_var).grid(row=15, column=0, columnspan=2, sticky="w", padx=20)
+tk.Label(root, textvariable=byte2627_var).grid(row=16, column=0, columnspan=2, sticky="w", padx=20)
 
 def on_closing():
     """Handle window closing event."""
