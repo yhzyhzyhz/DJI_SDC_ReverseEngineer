@@ -66,7 +66,7 @@ Byte 8 is Direction: so far only 3 possible observed:
 
     0x40 is a frame sent from power unit
 
-    0x80 is a frame sent to the power unit\
+    0x80 is a frame sent to the power unit
 
     0x00 only observed on few cases, seems to be a boardcast type of message
 
