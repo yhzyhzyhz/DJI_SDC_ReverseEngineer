@@ -127,7 +127,7 @@ Byte 24 is how many inputs available (0, 1, 2, 3 on 3 port MPPT module).
 
 Byte 25 indicate charging or not (0x00 when current is 0; 0x01 when charging). 
 
-Byte 26 27 are input power x0.1W. This is the number shown on LCD. 
+Byte 26 27 are input power x1W. This is the number shown on LCD. 
 
 Byte 28 29 are temperature x0.1. 
 
