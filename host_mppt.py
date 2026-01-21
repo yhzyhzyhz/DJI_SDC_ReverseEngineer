@@ -8,20 +8,22 @@ from datetime import datetime
 target_voltage = 52.20
 target_current = 7.65
 
+listener = 0x00
+
 sequence_number = 1
 
 INITIAL_BYTES1 = bytes([0x55, 0x0E, 0x04, 0x66, 0xAB, 0x00, 0x01, 0x00, 0x40, 0x00, 0x01, 0x01])
 INITIAL_BYTES2 = bytes([0x55, 0x0E, 0x04, 0x66, 0xAB, 0xEB, 0x01, 0x00, 0x40, 0x5A, 0x01, 0x01])
 
-FRAME_66 = bytes([0x55, 0x0E, 0x04, 0x66, 0xAB, 0xEB, 0x01, 0x00, 0x40, 0x5A, 0x02, 0x01])
+FRAME_66 =       bytes([0x55, 0x0E, 0x04, 0x66, 0xAB, 0xEB, 0x01, 0x00, 0x40, 0x5A, 0x02, 0x01])
 
 # Serial port configuration
-SERIAL_PORT = "/dev/ttyUSB0"
+SERIAL_PORT = "/dev/ttyACM0"
 BAUD_RATE = 115200
 serial_connection = None
 serial_thread = None
 serial_stop_event = threading.Event()
-log_file_path = f"Data/host_mppt_serial_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+log_file_path = f"Data/host_mppt_serial_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}z.txt"
 
 def construct_frame_38():
     """Construct the byte frame for command 0x38."""
@@ -31,7 +33,7 @@ def construct_frame_38():
     frame.append(0x04)  # 2: Class_A byte
     frame.append(0x38)  # 3: Class_B byte
     frame.append(0xAB)  # 4: Talker
-    frame.append(0xEB)  # 5: Listener
+    frame.append(listener)  # 5: Listener
 
     global sequence_number
     # Convert sequence number to 2 bytes in little-endian format Bytes 6-7
@@ -54,7 +56,7 @@ def construct_frame_38():
     frame.append(0x01) # 16: charging enable?
     frame.append(0x01) # 17: is charging?
     frame.append(0x00) # 18: fixed byte
-    frame.append(0x8F) # 19: bitwise flags?
+    frame.append(0x71) # 19: bitwise flags?
     frame.append(0x01) # 20: is charging?
 
     return bytes(frame)
@@ -75,9 +77,13 @@ def update_sequence_number(data: bytes) -> bytes:
     mutable_data[6] = seq_bytes[0]
     mutable_data[7] = seq_bytes[1]
 
+    #update listener id
+    mutable_data[5] = listener
+
     sequence_number += 1
 
     return bytes(mutable_data)
+
 
 def add_crc16_checksum(data: bytes) -> bytes:
     """
@@ -157,13 +163,26 @@ def serial_worker():
             log_file.write(log_entry)
             log_file.flush()
 
-            # Receive data from serial port
+            time.sleep(0.05)
             if serial_connection.in_waiting > 0:
                 data = serial_connection.read(serial_connection.in_waiting)
                 log_entry = f"[{datetime.now()}] RECV: {' '.join(f'{byte:02X}' for byte in data)}\n"
                 print(log_entry.strip())
                 log_file.write(log_entry)
                 log_file.flush()
+
+                i = 0
+                while data[i] != 0x55:
+                    i += 1
+                if i < (len(data) - 4):
+                    global listener
+                    listener = data[i+4]
+                    log_entry = f"[{datetime.now()}] Device: 0x{listener:02X}\n"
+                    print(log_entry.strip())
+                    log_file.write(log_entry)
+                    log_file.flush()
+
+
 
             frame_to_send = add_crc16_checksum(update_sequence_number(INITIAL_BYTES2))
             serial_connection.write(frame_to_send)
@@ -172,13 +191,21 @@ def serial_worker():
             log_file.write(log_entry)
             log_file.flush()
 
-
+            time.sleep(0.05)
+            if serial_connection.in_waiting > 0:
+                data = serial_connection.read(serial_connection.in_waiting)
+                log_entry = f"[{datetime.now()}] RECV: {' '.join(f'{byte:02X}' for byte in data)}\n"
+                print(log_entry.strip())
+                log_file.write(log_entry)
+                log_file.flush()
 
             while not serial_stop_event.is_set():
                 try:
                     # Send bytes every 500ms
                     current_time = time.time()
                     if current_time - last_send_time >= 0.5:
+
+                        last_send_time = current_time
 
                         # frame_to_send = add_crc16_checksum(update_sequence_number(INITIAL_BYTES1))
                         frame_to_send = add_crc16_checksum(update_sequence_number(FRAME_66))
@@ -188,38 +215,44 @@ def serial_worker():
                         log_file.write(log_entry)
                         log_file.flush()
 
+                        time.sleep(0.05)
+                        if serial_connection.in_waiting > 0:
+                            data = serial_connection.read(serial_connection.in_waiting)
+                            log_entry = f"[{datetime.now()}] RECV: {' '.join(f'{byte:02X}' for byte in data)}\n"
+                            print(log_entry.strip())
+                            log_file.write(log_entry)
+                            log_file.flush()
+                            
+                            # Parse frames from received data
+                            if len(data) > 3:
+                                i = 0
+                                while i < len(data):
+                                    if data[i] == 0x55:
+                                        frame_length = data[i + 1]
+                                        if i + frame_length <= len(data):
+                                            frame = data[i : (i + frame_length)]
+                                            if len(frame) > 3 and frame[3] == 0x9C:
+                                                process_frame_9c(frame)
+                                            i += frame_length + 2
+                                        else:
+                                            i += 1
+                                    else:
+                                        i += 1
+
                         frame_to_send = add_crc16_checksum(construct_frame_38())
                         serial_connection.write(frame_to_send)
                         log_entry = f"[{datetime.now()}] SENT: {' '.join(f'{byte:02X}' for byte in frame_to_send)}\n"
                         print(log_entry.strip())
                         log_file.write(log_entry)
                         log_file.flush()
-
-                        last_send_time = current_time
                     
-                    # Receive data from serial port
-                    if serial_connection.in_waiting > 0:
-                        data = serial_connection.read(serial_connection.in_waiting)
-                        log_entry = f"[{datetime.now()}] RECV: {' '.join(f'{byte:02X}' for byte in data)}\n"
-                        print(log_entry.strip())
-                        log_file.write(log_entry)
-                        log_file.flush()
-                        
-                        # Parse frames from received data
-                        if len(data) > 3:
-                            i = 0
-                            while i < len(data):
-                                if data[i] == 0x55 and i + 1 < len(data):
-                                    frame_length = data[i + 1]
-                                    if i + frame_length + 2 <= len(data):
-                                        frame = data[i:i + frame_length + 2]
-                                        if len(frame) > 3 and frame[3] == 0x9C:
-                                            process_frame_9c(frame)
-                                        i += frame_length + 2
-                                    else:
-                                        i += 1
-                                else:
-                                    i += 1
+                        time.sleep(0.05)
+                        if serial_connection.in_waiting > 0:
+                            data = serial_connection.read(serial_connection.in_waiting)
+                            log_entry = f"[{datetime.now()}] RECV: {' '.join(f'{byte:02X}' for byte in data)}\n"
+                            print(log_entry.strip())
+                            log_file.write(log_entry)
+                            log_file.flush()
                     
                     time.sleep(0.01)  # Small sleep to prevent busy waiting
                     
@@ -283,8 +316,8 @@ def process_frame_9c(frame):
         input_voltage_3 = int.from_bytes(frame[34:36], byteorder='little') * 0.01
         
         # Update variables
-        byte2021_var.set(f"Byte20-21: {int.from_bytes(frame[20:22], byteorder='little')}")
-        byte2223_var.set(f"Byte22-23: {int.from_bytes(frame[22:24], byteorder='little')}")
+        byte2021_var.set(f"Input Voltage: {int.from_bytes(frame[20:22], byteorder='little') * 0.01}")
+        byte2223_var.set(f"Input Current: {int.from_bytes(frame[22:24], byteorder='little') * 0.01}")
         byte2627_var.set(f"Input Power: {int.from_bytes(frame[26:28], byteorder='little')} W")
         
         output_power = output_voltage * output_current
@@ -298,8 +331,6 @@ def process_frame_9c(frame):
     except Exception as e:
         print(f"Error processing 0x9C frame: {e}")
 
-test = add_crc16_checksum(update_sequence_number(INITIAL_BYTES1))
-print("Test Frame with CRC:", ' '.join(f'{byte:02X}' for byte in test))
 
 # --- Setup Main Window ---
 root = tk.Tk()
@@ -333,8 +364,8 @@ status_label = tk.Label(root, text="Enter values and click Set")
 status_label.grid(row=4, column=0, columnspan=2, pady=10)
 
 # Create variables for frame data display
-byte2021_var = tk.StringVar(value="Byte20-21: N/A")
-byte2223_var = tk.StringVar(value="Byte22-23: N/A")
+byte2021_var = tk.StringVar(value="Input Voltage: N/A")
+byte2223_var = tk.StringVar(value="Input Current: N/A")
 byte2627_var = tk.StringVar(value="Input Power: N/A")
 output_power_var = tk.StringVar(value="Output Power: N/A")
 output_voltage_var = tk.StringVar(value="Output Voltage: N/A")

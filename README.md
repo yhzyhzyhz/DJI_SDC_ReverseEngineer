@@ -52,7 +52,7 @@ Byte 0 is always 0x55 indicate the frame starts.
 
 Byte 1 is length, indicate how many bytes in this frame. (Including the start byte and length byte) 
 
-Byte 2 seems always 0x04. I name it as Class_A
+Byte 2 seems always 0x04. I name it as Class_A. 
 
 Byte 3 is Class_B
 
@@ -113,17 +113,15 @@ Power unit request information from MPPT module.
 
 MPPT reply to power unit 0x66 request. 
 
-Byte 16 17 are output voltage. This is the number shown on LCD. 
+Byte 16 17 are output voltage. For 3 port MPPT This is the SDC port voltage shown on LCD. For single port MPPT, this value is always 0. 
 
-Byte 18 19 are current. 
+Byte 18 19 are current. For single port MPPT, this value is always 0. 
 
-Byte 20 21 unknown. 
+Byte 20 21 are input voltage in x0.01V. For single port MPPT this is input voltage and the SDC port voltage shown on LCD; For 3 port MPPT this might be the DC/DC input voltage. 
 
-Byte 22 23 seems to be the max input voltage. 
-(On 3 port MPPT module this is the highest port voltage on the 3 ports. 
-Also is the port used to charge the battery.)
+Byte 22 23 are input current in x0.01A
 
-Byte 24 is how many inputs available (0, 1, 2, 3 on 3 port MPPT module). 
+Byte 24 is how many inputs available (0, 1, 2, 3 on 3 port MPPT module. For single port MPPT, this value is always 0). 
 
 Byte 25 indicate charging or not (0x00 when current is 0; 0x01 when charging). 
 
